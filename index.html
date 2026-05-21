@@ -18,19 +18,17 @@
   <body class="bg-[#FDFCFB] text-[#1A1A1A] font-sans antialiased min-h-screen flex flex-col">
     <!-- Detail Modal -->
     <div id="detail-modal" class="fixed inset-0 z-[60] hidden flex-col items-center justify-center p-4 bg-[#1A1A1A]/80 backdrop-blur-sm">
-      <div class="bg-white w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh] relative">
+      <div class="bg-white w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] relative">
         <div class="px-6 py-4 editorial-border flex justify-between items-center bg-[#FAF9F6] sticky top-0 z-10">
           <h2 class="serif italic text-xl font-bold">Contact Card Info</h2>
           <button onclick="closeDetailModal()" class="opacity-50 hover:opacity-100 transition-opacity p-2 -mr-2">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
-        <div id="detail-modal-content" class="p-6 overflow-y-auto flex-1 space-y-4">
+        <div id="detail-modal-content" class="p-6 sm:p-8 overflow-y-auto flex-1">
           <!-- Content injected here -->
         </div>
-        <div class="p-6 editorial-border border-t bg-[#FAF9F6] sticky bottom-0">
-          <button type="button" onclick="switchToEdit()" class="w-full bg-[#1A1A1A] text-white text-[11px] font-bold uppercase tracking-widest px-6 py-3 hover:bg-neutral-800 transition-colors">Edit Record</button>
-        </div>
+        <button type="button" onclick="switchToEdit()" class="absolute bottom-5 right-5 z-20 bg-[#1A1A1A] text-white text-[11px] font-bold uppercase tracking-widest px-5 py-3 shadow-lg hover:bg-neutral-800 transition-colors">Edit Record</button>
       </div>
     </div>
 
@@ -55,19 +53,21 @@
       </div>
     </div>
 
-    <header class="h-20 px-6 sm:px-10 flex items-center justify-between editorial-border bg-white/50 backdrop-blur-md sticky top-0 z-50">
-      <div class="flex items-baseline space-x-4">
-        <h1 class="serif text-3xl font-bold italic tracking-tight">The Directory</h1>
-        <span class="text-[10px] uppercase tracking-[0.2em] opacity-50 font-semibold hidden sm:inline">Business Card Archive / Vol 01</span>
-      </div>
-      <div class="flex items-center space-x-4 sm:space-x-8 flex-1 justify-end">
-        <div class="relative hidden sm:block">
-          <input type="text" id="search-input" placeholder="Search connections..." class="bg-transparent border-b border-black text-sm py-1 pr-8 focus:outline-none placeholder:opacity-30 w-48 lg:w-64">
-          <svg class="absolute right-0 top-1.5 w-4 h-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+    <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md editorial-border">
+      <div class="px-6 sm:px-10 h-16 sm:h-20 flex items-center justify-between gap-4">
+        <div class="flex min-w-0 items-baseline gap-4">
+          <h1 class="serif text-2xl sm:text-3xl font-bold italic tracking-tight truncate">The Directory</h1>
+          <span class="text-[10px] uppercase tracking-[0.2em] opacity-50 font-semibold hidden md:inline">Business Card Archive / Vol 01</span>
         </div>
-        <button onclick="window.location.reload()" class="bg-[#1A1A1A] text-white text-[11px] font-bold uppercase tracking-widest px-4 py-2 sm:px-6 sm:py-3 hover:bg-neutral-800 transition-colors">
+        <button onclick="window.location.reload()" class="shrink-0 bg-[#1A1A1A] text-white text-[11px] font-bold uppercase tracking-widest px-4 py-2 sm:px-6 sm:py-3 hover:bg-neutral-800 transition-colors">
           <span>REFRESH</span>
         </button>
+      </div>
+      <div class="px-6 sm:px-10 pb-4">
+        <div class="relative w-full max-w-3xl">
+          <input type="text" id="search-input" placeholder="Search by name, company, title, or service..." class="w-full bg-[#FAF9F6] border border-[rgba(26,26,26,0.18)] px-4 py-3 pr-11 text-sm focus:outline-none focus:border-[#1A1A1A] placeholder:opacity-40">
+          <svg class="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 opacity-40 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        </div>
       </div>
     </header>
     
@@ -310,6 +310,90 @@
         return '';
       }
 
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function normalizeFieldKey(key) {
+        return String(key || '').toLowerCase().replace(/[\s_-]/g, '');
+      }
+
+      function isDescriptionField(key) {
+        const normalized = normalizeFieldKey(key);
+        return ['description', 'desc', 'summary', 'screensummary'].includes(normalized) || String(key).includes('簡述');
+      }
+
+      function isPublicField(key) {
+        const normalized = normalizeFieldKey(key);
+        return ['public', 'ispublic', 'visible', 'isvisible', 'published'].includes(normalized) || String(key).includes('公開');
+      }
+
+      function isImageField(key) {
+        const normalized = normalizeFieldKey(key);
+        return ['image', 'photo', 'avatar', 'picture', 'imageurl'].includes(normalized) || String(key).includes('圖片') || String(key).includes('照片') || String(key).includes('頭像');
+      }
+
+      function isSystemField(key) {
+        const normalized = normalizeFieldKey(key);
+        return normalized === 'id' || normalized === 'row_number' || normalized === 'rownumber' || normalized.includes('userid') || String(key).includes('名片id') || String(key).includes('歸屬');
+      }
+
+      function findSemanticField(item, terms) {
+        const keys = Object.keys(item || {});
+        const match = keys.find(key => {
+          const normalized = normalizeFieldKey(key);
+          return terms.some(term => normalized.includes(normalizeFieldKey(term)) || String(key).includes(term));
+        });
+        if (!match || item[match] === null || item[match] === undefined) return '';
+        return String(item[match]);
+      }
+
+      function isTruthyValue(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        return ['true', '1', 'yes', 'y', 'on', '公開', '是'].includes(normalized);
+      }
+
+      function makeContactLink(key, value) {
+        const label = String(value || '').trim();
+        if (!label) return '';
+
+        const normalized = normalizeFieldKey(key);
+        const escapedLabel = escapeHtml(label).replace(/\n/g, '<br>');
+        const hrefValue = encodeURIComponent(label);
+
+        if (normalized.includes('email') || normalized.includes('mail') || normalized.includes('信箱')) {
+          return `<a href="mailto:${escapeHtml(label)}" class="text-neutral-900 underline decoration-neutral-300 underline-offset-4 hover:decoration-neutral-900">${escapedLabel}</a>`;
+        }
+
+        if (normalized.includes('phone') || normalized.includes('mobile') || normalized.includes('tel') || normalized.includes('電話') || normalized.includes('手機')) {
+          const phoneHref = label.replace(/[^\d+]/g, '');
+          return `<a href="tel:${escapeHtml(phoneHref)}" class="text-neutral-900 underline decoration-neutral-300 underline-offset-4 hover:decoration-neutral-900">${escapedLabel}</a>`;
+        }
+
+        if (normalized.includes('line')) {
+          const lineId = label.replace(/^@/, '');
+          return `<a href="https://line.me/ti/p/~${encodeURIComponent(lineId)}" target="_blank" rel="noopener noreferrer" class="text-neutral-900 underline decoration-neutral-300 underline-offset-4 hover:decoration-neutral-900">${escapedLabel}</a>`;
+        }
+
+        if (normalized.includes('address') || normalized.includes('location') || normalized.includes('地址')) {
+          return `<a href="https://www.google.com/maps/search/?api=1&query=${hrefValue}" target="_blank" rel="noopener noreferrer" class="text-neutral-900 underline decoration-neutral-300 underline-offset-4 hover:decoration-neutral-900">${escapedLabel}</a>`;
+        }
+
+        const looksLikeUrl = /^https?:\/\//i.test(label) || /^www\./i.test(label);
+        const isUrlField = normalized.includes('url') || normalized.includes('website') || normalized.includes('site') || normalized.includes('facebook') || normalized.includes('instagram') || normalized.includes('linkedin') || normalized.includes('網址');
+        if (looksLikeUrl || isUrlField) {
+          const href = /^https?:\/\//i.test(label) ? label : `https://${label}`;
+          return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" class="text-neutral-900 underline decoration-neutral-300 underline-offset-4 hover:decoration-neutral-900">${escapedLabel}</a>`;
+        }
+
+        return escapedLabel;
+      }
+
       function renderCards(cards, container) {
         container.innerHTML = '';
 
@@ -406,7 +490,7 @@
       let currentEditCard = null;
       let currentDetailCard = null;
 
-      function openDetailModal(cardData) {
+      function legacyOpenDetailModal(cardData) {
         currentDetailCard = cardData;
         const modal = document.getElementById('detail-modal');
         const contentContainer = document.getElementById('detail-modal-content');
@@ -446,6 +530,59 @@
         document.body.style.overflow = 'hidden';
       }
 
+      function openDetailModal(cardData) {
+        currentDetailCard = cardData;
+        const modal = document.getElementById('detail-modal');
+        const contentContainer = document.getElementById('detail-modal-content');
+        const hiddenKeys = ['row_number', 'åç‰‡id', 'æ­¸å±¬userid', 'id'];
+        const name = guessField(cardData, ['name', 'å§“å', 'è¯çµ¡äºº', 'å€‹äººå', 'å€‹äººåç¨±', 'full_name', 'fullname', 'first_name', 'Title', 'Name', 'Display Name']) || 'Contact';
+        const company = guessField(cardData, ['company', 'å…¬å¸', 'å…¬å¸åç¨±', 'organization', 'Company', 'Organization']);
+        const jobTitle = guessField(cardData, ['jobtitle', 'è·ç¨±', 'position', 'role', 'è·ä½', 'Title', 'job_title', 'Job Title']);
+        const image = guessField(cardData, ['image', 'photo', 'avatar', 'picture', 'imageUrl', 'é ­åƒ', 'ç…§ç‰‡', 'åœ–ç‰‡', 'åœ–ç‰‡ç¶²å€', 'Avatar', 'Image']);
+        const displayName = name !== 'Contact' ? name : (findSemanticField(cardData, ['name', '姓名', '聯絡人', '個人名', '個人名稱', 'displayname']) || 'Contact');
+        const displayCompany = company || findSemanticField(cardData, ['company', '公司', '公司名稱', 'organization']);
+        const displayJobTitle = jobTitle || findSemanticField(cardData, ['jobtitle', '職稱', '職位', 'position', 'role']);
+        const displayImage = image || findSemanticField(cardData, ['image', 'photo', 'avatar', 'picture', '圖片', '照片', '頭像']);
+        let fieldsHtml = '';
+
+        for (const key in cardData) {
+          let val = cardData[key];
+          if (typeof val === 'object') {
+            try { val = JSON.stringify(val); } catch(e) {}
+          }
+          const valStr = String(val !== null && val !== undefined ? val : '');
+          const normalizedKey = key.toLowerCase();
+
+          if (!hiddenKeys.includes(normalizedKey) && !isSystemField(key) && !isImageField(key) && !isDescriptionField(key) && valStr.trim() !== '') {
+            fieldsHtml += `
+              <div class="text-center border-b border-[rgba(26,26,26,0.10)] pb-4">
+                <label class="block text-[10px] mono uppercase tracking-widest opacity-45 mb-2">${escapeHtml(key)}</label>
+                <div class="text-sm sm:text-base font-medium break-words text-neutral-800">${makeContactLink(key, valStr)}</div>
+              </div>
+            `;
+          }
+        }
+
+        contentContainer.innerHTML = `
+          <div class="mx-auto max-w-xl pb-16 text-center">
+            ${displayImage ? `
+              <div class="mb-6 flex justify-center">
+                <img src="${escapeHtml(displayImage)}" class="w-32 h-32 rounded-full object-cover border border-neutral-200 shadow-sm" onerror="this.style.display='none'">
+              </div>
+            ` : ''}
+            <h3 class="serif text-3xl sm:text-4xl italic font-bold mb-2">${escapeHtml(displayName)}</h3>
+            ${displayJobTitle ? `<p class="text-[11px] uppercase tracking-[0.22em] font-bold text-neutral-400 mb-1">${escapeHtml(displayJobTitle)}</p>` : ''}
+            ${displayCompany ? `<p class="text-sm text-neutral-600 mb-8">${escapeHtml(displayCompany)}</p>` : '<div class="mb-8"></div>'}
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5 text-center">
+              ${fieldsHtml}
+            </div>
+          </div>
+        `;
+
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+      }
+
       function closeDetailModal() {
         const modal = document.getElementById('detail-modal');
         modal.classList.add('hidden');
@@ -456,6 +593,36 @@
         if (!currentDetailCard) return;
         closeDetailModal();
         openEditModal(currentDetailCard);
+      }
+
+      function renderEditField(key, valStr) {
+        const safeKey = escapeHtml(key);
+        const safeValue = escapeHtml(valStr);
+
+        if (isPublicField(key)) {
+          const checked = isTruthyValue(valStr) ? 'checked' : '';
+          return `
+            <div class="mb-5 flex items-center justify-between gap-4 border-b border-[rgba(26,26,26,0.12)] pb-4">
+              <div>
+                <label class="block text-[10px] mono uppercase tracking-widest opacity-60 mb-1">${safeKey}</label>
+                <p class="text-xs text-neutral-500">Visible to others</p>
+              </div>
+              <label class="relative inline-flex cursor-pointer items-center">
+                <input type="hidden" name="${safeKey}" value="false">
+                <input type="checkbox" name="${safeKey}" value="true" class="peer sr-only" ${checked}>
+                <span class="h-7 w-12 rounded-full bg-neutral-200 transition-colors peer-checked:bg-[#1A1A1A]"></span>
+                <span class="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5"></span>
+              </label>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="mb-5">
+            <label class="block text-[10px] mono uppercase tracking-widest opacity-60 mb-1">${safeKey}</label>
+            <input type="text" name="${safeKey}" value="${safeValue}" class="w-full border-b border-[rgba(26,26,26,0.15)] py-2 focus:outline-none focus:border-black text-sm bg-transparent transition-colors">
+          </div>
+        `;
       }
 
       function openEditModal(cardData) {
@@ -474,15 +641,10 @@
            }
            let valStr = String(val !== null && val !== undefined ? val : '');
            
-           if (hiddenKeys.includes(key.toLowerCase())) {
-             formContainer.innerHTML += `<input type="hidden" name="${key}" value="${valStr.replace(/"/g, '&quot;')}">`;
+           if (hiddenKeys.includes(key.toLowerCase()) || isSystemField(key)) {
+             formContainer.innerHTML += `<input type="hidden" name="${escapeHtml(key)}" value="${escapeHtml(valStr)}">`;
            } else {
-             formContainer.innerHTML += `
-               <div class="mb-5">
-                 <label class="block text-[10px] mono uppercase tracking-widest opacity-60 mb-1">${key}</label>
-                 <input type="text" name="${key}" value="${valStr.replace(/"/g, '&quot;')}" class="w-full border-b border-[rgba(26,26,26,0.15)] py-2 focus:outline-none focus:border-black text-sm bg-transparent transition-colors">
-               </div>
-             `;
+             formContainer.innerHTML += renderEditField(key, valStr);
            }
         }
         
