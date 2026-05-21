@@ -23,14 +23,10 @@ async function proxyCards(request) {
   const requestUrl = new URL(request.url);
   const id = requestUrl.searchParams.get('id');
 
-  if (!id) {
-    return jsonResponse({
-      error: 'Missing required id query parameter.',
-    }, { status: 400 });
-  }
-
   const webhookUrl = new URL(FETCH_WEBHOOK_URL);
-  webhookUrl.searchParams.set('id', id);
+  if (id) {
+    webhookUrl.searchParams.set('id', id);
+  }
 
   const upstream = await fetch(webhookUrl.toString(), {
     method: 'GET',
