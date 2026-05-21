@@ -24,9 +24,7 @@ async function proxyCards(request) {
   const id = requestUrl.searchParams.get('id');
 
   const webhookUrl = new URL(FETCH_WEBHOOK_URL);
-  if (id) {
-    webhookUrl.searchParams.set('id', id);
-  }
+  webhookUrl.searchParams.set('id', id || '');
 
   const upstream = await fetch(webhookUrl.toString(), {
     method: 'GET',
