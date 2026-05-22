@@ -260,6 +260,23 @@
         return card;
       }
 
+      function getCardIdentity(card) {
+        const parsedCard = getParsedCard(card);
+        return guessField(parsedCard, ['名片ID', 'cardId', 'card_id', 'id']) ||
+          [
+            guessField(parsedCard, ['個人名', '姓名', 'name', 'Name']),
+            guessField(parsedCard, ['公司品牌名', '公司', 'company', 'Company']),
+            guessField(parsedCard, ['EMAIL', 'email', 'Email']),
+            guessField(parsedCard, ['個人手機', 'phone', 'mobile', 'Phone', 'Mobile'])
+          ].filter(Boolean).join('|') ||
+          JSON.stringify(parsedCard);
+      }
+
+      function removeDuplicateCards(cards, existingCards) {
+        const existingIds = new Set(existingCards.map(getCardIdentity));
+        return cards.filter(card => !existingIds.has(getCardIdentity(card)));
+      }
+
       async function refreshCards() {
         const viewerId = getViewerId();
         const requests = [
@@ -279,7 +296,7 @@
         const results = await Promise.all(requests);
         if (viewerId) {
           personalData = results[0];
-          publicData = results[1];
+          publicData = removeDuplicateCards(results[1], personalData);
         } else {
           personalData = [];
           publicData = results[0];
@@ -387,6 +404,7 @@
       }
 
       function renderCardSections(personalCards, publicCards) {
+        const hasViewer = Boolean(getViewerId());
         const personalSection = document.getElementById('personal-section');
         const publicSection = document.getElementById('public-section');
         const personalContainer = document.getElementById('personal-card-container');
@@ -395,12 +413,12 @@
         const publicCount = document.getElementById('public-count');
         const emptyState = document.getElementById('empty-state');
 
-        renderCards(personalCards, personalContainer, false);
+        renderCards(personalCards, personalContainer, hasViewer);
         renderCards(publicCards, publicContainer, false);
 
-        personalSection.classList.toggle('hidden', personalCards.length === 0);
+        personalSection.classList.toggle('hidden', !hasViewer && personalCards.length === 0);
         publicSection.classList.toggle('hidden', publicCards.length === 0);
-        emptyState.classList.toggle('hidden', personalCards.length + publicCards.length > 0);
+        emptyState.classList.toggle('hidden', hasViewer || personalCards.length + publicCards.length > 0);
 
         personalCount.textContent = `${personalCards.length} cards`;
         publicCount.textContent = `${publicCards.length} cards`;
