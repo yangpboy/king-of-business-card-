@@ -1,4 +1,5 @@
 const FETCH_WEBHOOK_URL = 'https://yangpoboy.zeabur.app/webhook/70527ea1-4c09-4b5c-992e-640809dc99d2';
+const PUBLIC_CARDS_WEBHOOK_URL = 'https://yangpoboy.zeabur.app/webhook/a8b627c2-bbb3-4500-85b1-9d8bf9a29c17';
 const UPDATE_WEBHOOK_URL = 'https://yangpoboy.zeabur.app/webhook/fccaa8c6-e7de-438d-87ff-dd7eab3e9c07';
 
 const corsHeaders = {
@@ -23,9 +24,21 @@ async function proxyCards(request) {
   const requestUrl = new URL(request.url);
   const id = requestUrl.searchParams.get('id');
 
-  const webhookUrl = new URL(FETCH_WEBHOOK_URL);
-  webhookUrl.searchParams.set('id', id || '');
+  if (!id) {
+    return jsonResponse([]);
+  }
 
+  const webhookUrl = new URL(FETCH_WEBHOOK_URL);
+  webhookUrl.searchParams.set('id', id);
+
+  return proxyWebhook(webhookUrl, 'Fetch cards webhook');
+}
+
+async function proxyPublicCards() {
+  return proxyWebhook(new URL(PUBLIC_CARDS_WEBHOOK_URL), 'Public cards webhook');
+}
+
+async function proxyWebhook(webhookUrl, label) {
   const upstream = await fetch(webhookUrl.toString(), {
     method: 'GET',
     headers: {
@@ -37,15 +50,13 @@ async function proxyCards(request) {
 
   if (!upstream.ok) {
     return jsonResponse({
-      error: `Fetch webhook failed with status ${upstream.status}`,
+      error: `${label} failed with status ${upstream.status}`,
       detail: body,
     }, { status: upstream.status });
   }
 
   if (!body.trim()) {
-    return jsonResponse({
-      error: 'Fetch webhook returned an empty body. Check the n8n Respond to Webhook output.',
-    }, { status: 502 });
+    return jsonResponse([]);
   }
 
   return new Response(body, {
@@ -107,6 +118,10 @@ export default {
 
     if (url.pathname === '/api/cards' && request.method === 'GET') {
       return proxyCards(request);
+    }
+
+    if (url.pathname === '/api/public-cards' && request.method === 'GET') {
+      return proxyPublicCards();
     }
 
     if (url.pathname === '/api/update' && request.method === 'POST') {

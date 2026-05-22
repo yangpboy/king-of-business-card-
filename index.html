@@ -93,8 +93,30 @@
       </div>
 
       <!-- Data Container -->
-      <div id="card-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-         <!-- Cards will be injected here by main.ts -->
+      <div id="card-container" class="space-y-12">
+        <section id="personal-section" class="hidden">
+          <div class="mb-5 flex items-end justify-between gap-4 border-b border-[rgba(26,26,26,0.12)] pb-3">
+            <div>
+              <p class="mono text-[10px] uppercase tracking-[0.24em] opacity-40">Private Directory</p>
+              <h2 class="serif text-3xl italic font-bold">My Cards</h2>
+            </div>
+            <span id="personal-count" class="mono text-[10px] uppercase tracking-widest opacity-40"></span>
+          </div>
+          <div id="personal-card-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"></div>
+        </section>
+
+        <section id="public-section" class="hidden">
+          <div class="mb-5 flex items-end justify-between gap-4 border-b border-[rgba(26,26,26,0.12)] pb-3">
+            <div>
+              <p class="mono text-[10px] uppercase tracking-[0.24em] opacity-40">Public Directory</p>
+              <h2 class="serif text-3xl italic font-bold">Public Cards</h2>
+            </div>
+            <span id="public-count" class="mono text-[10px] uppercase tracking-widest opacity-40"></span>
+          </div>
+          <div id="public-card-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"></div>
+        </section>
+
+        <div id="empty-state" class="hidden text-center text-gray-500 py-10 bg-white shadow-sm rounded-lg border border-gray-200">No cards found</div>
       </div>
     </main>
 
@@ -104,10 +126,14 @@
     </footer>
     
     <script>
+      const API_ORIGIN = window.location.protocol === 'file:' ? 'https://king-of-business-card.yangpboy.workers.dev' : window.location.origin;
       const FETCH_CARDS_URL = '/api/cards';
+      const FETCH_PUBLIC_CARDS_URL = '/api/public-cards';
       const UPDATE_CARD_URL = '/api/update';
 
       let originalData = [];
+      let personalData = [];
+      let publicData = [];
 
       function getViewerId() {
         return new URLSearchParams(window.location.search).get('id') || '';
@@ -115,11 +141,15 @@
 
       function getCardsUrl() {
         const id = getViewerId();
-        const url = new URL(FETCH_CARDS_URL, window.location.origin);
+        const url = new URL(FETCH_CARDS_URL, API_ORIGIN);
         if (id) {
           url.searchParams.set('id', id);
         }
-        return url.pathname + url.search;
+        return url.toString();
+      }
+
+      function getPublicCardsUrl() {
+        return new URL(FETCH_PUBLIC_CARDS_URL, API_ORIGIN).toString();
       }
 
       function normalizeWebhookPayload(data) {
@@ -157,8 +187,8 @@
         return data || [];
       }
 
-      async function fetchCardsFromWebhook() {
-        const response = await fetch(getCardsUrl(), {
+      async function fetchCardsFromWebhook(url = getCardsUrl(), label = 'cards') {
+        const response = await fetch(url, {
           method: 'GET',
           headers: {
             'Accept': 'application/json'
@@ -166,7 +196,7 @@
         });
 
         if (!response.ok) {
-          throw new Error(`伺服器回應錯誤 (${response.status})`);
+          throw new Error(`${label} server response error (${response.status})`);
         }
 
         const text = await response.text();
@@ -175,13 +205,13 @@
           try {
             data = JSON.parse(text);
           } catch (e) {
-            throw new Error('伺服器回傳了非 JSON 格式的資料');
+            throw new Error(`${label} returned non-JSON data`);
           }
         } else {
-          throw new Error('讀取 webhook 沒有回傳任何資料，請確認 n8n 的 Respond to Webhook 有把 Google 資料輸出到 response body');
+          return [];
         }
 
-        console.log('Fetch webhook payload:', data);
+        console.log(`${label} webhook payload:`, data);
         return normalizeWebhookPayload(data);
       }
 
@@ -203,10 +233,33 @@
       }
 
       async function refreshCards() {
-        originalData = await fetchCardsFromWebhook();
+        const viewerId = getViewerId();
+        const requests = [
+          fetchCardsFromWebhook(getPublicCardsUrl(), 'public cards').catch(err => {
+            console.warn('Public cards failed:', err);
+            return [];
+          })
+        ];
+
+        if (viewerId) {
+          requests.unshift(fetchCardsFromWebhook(getCardsUrl(), 'personal cards').catch(err => {
+            console.warn('Personal cards failed:', err);
+            return [];
+          }));
+        }
+
+        const results = await Promise.all(requests);
+        if (viewerId) {
+          personalData = results[0];
+          publicData = results[1];
+        } else {
+          personalData = [];
+          publicData = results[0];
+        }
+        originalData = [...personalData, ...publicData];
         const searchInput = document.getElementById('search-input');
         const term = searchInput ? searchInput.value.toLowerCase() : '';
-        filterAndRender(term, document.getElementById('card-container'));
+        filterAndRender(term);
       }
 
       async function postCardUpdate(data) {
@@ -216,7 +269,7 @@
         };
 
         try {
-          const response = await fetch(UPDATE_CARD_URL, {
+          const response = await fetch(new URL(UPDATE_CARD_URL, API_ORIGIN).toString(), {
             method: 'POST',
             headers: {
               'Accept': 'application/json',
@@ -235,7 +288,7 @@
             throw err;
           }
 
-          return fetch(UPDATE_CARD_URL, {
+          return fetch(new URL(UPDATE_CARD_URL, API_ORIGIN).toString(), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded'
@@ -257,13 +310,12 @@
         if (searchInput) {
           searchInput.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
-            filterAndRender(term, containerEl);
+            filterAndRender(term);
           });
         }
 
         try {
-          originalData = await fetchCardsFromWebhook();
-          renderCards(originalData, containerEl);
+          await refreshCards();
           loadingEl.style.display = 'none';
         } catch (err) {
           console.error(err);
@@ -293,11 +345,50 @@
           renderCards(filtered, container);
       }
 
+      function cardMatchesSearch(card, term) {
+        const parsedCard = getParsedCard(card);
+        const cleanTerm = String(term || '').replace(/^#/, '').toLowerCase();
+        if (!cleanTerm) return true;
+
+        const name = (guessField(parsedCard, ['name', '姓名', '聯絡人', '個人名', '個人名稱', 'full_name', 'fullname', 'first_name', 'Title', 'Name', 'Display Name']) || '').toLowerCase();
+        const company = (guessField(parsedCard, ['company', '公司', '公司名稱', 'organization', 'Company', 'Organization']) || '').toLowerCase();
+        const jobTitle = (guessField(parsedCard, ['jobtitle', '職稱', 'position', 'role', '職位', 'Title', 'job_title', 'Job Title']) || '').toLowerCase();
+        const service = (guessField(parsedCard, ['service', 'services', '服務項目', '服務', 'Service']) || '').toLowerCase();
+
+        return name.includes(cleanTerm) || company.includes(cleanTerm) || jobTitle.includes(cleanTerm) || service.includes(cleanTerm);
+      }
+
+      function renderCardSections(personalCards, publicCards) {
+        const personalSection = document.getElementById('personal-section');
+        const publicSection = document.getElementById('public-section');
+        const personalContainer = document.getElementById('personal-card-container');
+        const publicContainer = document.getElementById('public-card-container');
+        const personalCount = document.getElementById('personal-count');
+        const publicCount = document.getElementById('public-count');
+        const emptyState = document.getElementById('empty-state');
+
+        renderCards(personalCards, personalContainer, false);
+        renderCards(publicCards, publicContainer, false);
+
+        personalSection.classList.toggle('hidden', personalCards.length === 0);
+        publicSection.classList.toggle('hidden', publicCards.length === 0);
+        emptyState.classList.toggle('hidden', personalCards.length + publicCards.length > 0);
+
+        personalCount.textContent = `${personalCards.length} cards`;
+        publicCount.textContent = `${publicCards.length} cards`;
+      }
+
+      function filterAndRender(term) {
+        const filteredPersonal = personalData.filter(card => cardMatchesSearch(card, term));
+        const filteredPublic = publicData.filter(card => cardMatchesSearch(card, term));
+        renderCardSections(filteredPersonal, filteredPublic);
+      }
+
       function setSearchTerm(term) {
         const searchInput = document.getElementById('search-input');
         if (searchInput) {
           searchInput.value = term;
-          filterAndRender(term.toLowerCase(), document.getElementById('card-container'));
+          filterAndRender(term.toLowerCase());
         }
       }
 
@@ -394,10 +485,11 @@
         return escapedLabel;
       }
 
-      function renderCards(cards, container) {
+      function renderCards(cards, container, showEmpty = true) {
         container.innerHTML = '';
 
         if (cards.length === 0) {
+          if (!showEmpty) return;
           container.innerHTML = '<div class="col-span-full text-center text-gray-500 py-10 bg-white shadow-sm rounded-lg border border-gray-200">未取得任何名片資料</div>';
           return;
         }
