@@ -135,8 +135,36 @@
       let personalData = [];
       let publicData = [];
 
+      function getParamValue(params, keys) {
+        for (const key of keys) {
+          const value = params.get(key);
+          if (value && value.trim()) return value.trim();
+        }
+        return '';
+      }
+
       function getViewerId() {
-        return new URLSearchParams(window.location.search).get('id') || '';
+        const keys = ['id', 'userId', 'userid', 'uid', 'lineId', 'lineid', ''];
+        const searchParams = new URLSearchParams(window.location.search);
+        const searchValue = getParamValue(searchParams, keys);
+        if (searchValue) return searchValue;
+
+        const hash = window.location.hash || '';
+        const hashQuery = hash.includes('?') ? hash.slice(hash.indexOf('?')) : hash.replace(/^#/, '?');
+        const hashValue = getParamValue(new URLSearchParams(hashQuery), keys);
+        if (hashValue) return hashValue;
+
+        const liffState = searchParams.get('liff.state') || searchParams.get('state') || '';
+        if (liffState) {
+          try {
+            const decodedState = decodeURIComponent(liffState);
+            const stateQuery = decodedState.includes('?') ? decodedState.slice(decodedState.indexOf('?')) : decodedState;
+            const stateValue = getParamValue(new URLSearchParams(stateQuery), keys);
+            if (stateValue) return stateValue;
+          } catch (e) {}
+        }
+
+        return '';
       }
 
       function getCardsUrl() {
